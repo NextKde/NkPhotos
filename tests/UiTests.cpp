@@ -100,6 +100,11 @@ private slots:
         QVERIFY(QFile::remove(selected.toLocalFile())); library.refresh();
         QTRY_VERIFY_WITH_TIMEOUT(!library.loading(),5000);
         QCOMPARE(library.rowCount(),8); QCOMPARE(library.selectedIndex(),-1);
+        library.select(0);
+        QVERIFY(QMetaObject::invokeMethod(window,"openSelected"));
+        library.openFiles({QUrl::fromLocalFile(scratch.path()+"/images")});
+        QTRY_VERIFY_WITH_TIMEOUT(!library.loading(),5000);
+        QCOMPARE(window->property("viewing").toBool(),false);
         QVERIFY2(errors.isEmpty(),qPrintable(errors.join('\n')));
         window->close();
         QCoreApplication::removeTranslator(&translator);

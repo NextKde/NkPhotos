@@ -125,6 +125,7 @@ void PhotoLibrary::addFolder(const QUrl &url)
         m_folders.append(normalized.toString()); persist();
     }
     showCollection("folder", normalized);
+    emit galleryRequested();
 }
 void PhotoLibrary::removeFolder(const QUrl &url)
 {

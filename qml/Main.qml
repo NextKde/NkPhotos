@@ -45,6 +45,7 @@ KosAppWindow {
     Connections {
         target: photoLibrary
         function onViewRequested() { root.viewing = true; viewer.forceActiveFocus() }
+        function onGalleryRequested() { root.viewing = false }
     }
     function showCollection(mode, folder) {
         viewing = false

@@ -68,6 +68,7 @@ public:
 signals:
     void changed();
     void viewRequested();
+    void galleryRequested();
 private:
     void rebuild();
     void scheduleScan();
