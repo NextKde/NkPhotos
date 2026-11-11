@@ -8,6 +8,7 @@
 #include <QImageReader>
 #include <QFileInfo>
 #include <QDir>
+#include <QDataStream>
 
 class PhotoTests : public QObject {
     Q_OBJECT
@@ -71,6 +72,34 @@ private slots:
         QVERIFY(!provider.requestImage(key+"/thumb",&size,{50,50}).isNull());
         registry->sources.clear();
         QVERIFY(provider.requestImage(key+"/thumb",&size,{50,50}).isNull());
+    }
+    void previewBudgetsRejectLargeFilesAndDimensions() {
+        QTemporaryDir dir;
+        const auto path=image(dir.path(),"large.png");
+        QFile sparse(path); QVERIFY(sparse.open(QIODevice::ReadWrite));
+        QVERIFY(sparse.resize(64*1024*1024+1)); sparse.close();
+        QVERIFY(ImageProvider::decode(source(path),{80,80}).isNull());
+        const QString huge=dir.path()+"/huge.bmp";
+        QFile header(huge); QVERIFY(header.open(QIODevice::WriteOnly));
+        QDataStream stream(&header); stream.setByteOrder(QDataStream::LittleEndian);
+        stream << quint16(0x4d42) << quint32(54) << quint32(0) << quint32(54)
+               << quint32(40) << qint32(50000) << qint32(50000)
+               << quint16(1) << quint16(24) << quint32(0) << quint32(0)
+               << qint32(0) << qint32(0) << quint32(0) << quint32(0);
+        header.close();
+        QVERIFY(ImageProvider::decode(source(huge),{80,80}).isNull());
+    }
+    void selectedFileIsRefreshedAfterExternalChange() {
+        QTemporaryDir dir; const auto path=image(dir.path(),"changed.png");
+        PhotoLibrary model(std::make_shared<ImageRegistry>());
+        model.openFiles({QUrl::fromLocalFile(path)});
+        QTRY_VERIFY_WITH_TIMEOUT(!model.loading(),5000);
+        QCOMPARE(model.selectedIndex(),0);
+        const QString initial=model.selected().value("imageSource").toString();
+        QFile changed(path); QVERIFY(changed.open(QIODevice::Append));
+        changed.write("external-change"); changed.close();
+        QTRY_VERIFY_WITH_TIMEOUT(model.selected().value("imageSource").toString()!=initial,5000);
+        QCOMPARE(model.selected().value("url").toUrl(),QUrl::fromLocalFile(path));
     }
     void foldersFavoritesAndRemovalPreserveOriginals() {
         QTemporaryDir dir; const auto path = image(dir.path(),"photo.png");
