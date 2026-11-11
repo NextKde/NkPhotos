@@ -13,6 +13,15 @@ KosAppWindow {
     width: preferences.windowWidth; height: preferences.windowHeight
     minimumWidth: 740; minimumHeight: 480
     title: viewing && currentPhoto.name ? currentPhoto.name + " — NkPhotos" : "NkPhotos"
+    // A slightly deepened, vertically graded backdrop gives the floating
+    // toolbar and sidebar something to lift off of. On a flat fill both panels
+    // read as part of one slab instead of lying on top of the window.
+    background: Rectangle {
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: AppTheme.dark ? "#232329" : "#F8F8FB" }
+            GradientStop { position: 1.0; color: AppTheme.dark ? "#131316" : "#ECECF1" }
+        }
+    }
     // Presentation-only state is addressable by the native screenshot option.
     property bool viewing: false
     property bool infoVisible: false
@@ -27,6 +36,12 @@ KosAppWindow {
     property bool memoryPlaying: false
     readonly property var currentPhoto: memoryPlaying ? playbackItems[playbackIndex] || ({}) : photoLibrary.selected
     readonly property string viewKey: browserPage + ":" + photoLibrary.mode + ":" + photoLibrary.collectionId + ":" + photoLibrary.folder.toString()
+    // Shared "liquid glass" surface used by the floating toolbar and sidebar.
+    // Both sit on top of the window background, so they need to lift off it
+    // rather than disappear into it — hence the lightened fill plus a hairline
+    // rim instead of a hard border.
+    readonly property color glassSurface: AppTheme.dark ? "#2C2C31" : "#FBFBFD"
+    readonly property color glassEdge: AppTheme.dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.06)
     readonly property bool popupOpen: infoPopup.visible || addMenu.visible || viewMenu.visible || moreMenu.visible || appearanceMenu.visible || folderMenu.visible || collectionMenu.visible || actionMenu.visible || dialogs.anyOpen || memoryEditor.visible || memoryEditor.pickerOpen
     readonly property string collectionTitle: browserPage === "albums" ? qsTr("Albums") : browserPage === "memories" ? qsTr("Memories")
         : photoLibrary.mode === "favorites" ? qsTr("Favorites") : photoLibrary.mode === "recent" ? qsTr("Recent imports")
@@ -153,8 +168,20 @@ KosAppWindow {
     Shortcut { sequence: "Delete"; enabled: !root.popupOpen && !search.activeFocus && (root.viewing || root.browserPage === "library") && root.frozenActionIds().length > 0 && !root.frozenActionIds().some(id => photoLibrary.entry(id).temporary); onActivated: dialogs.confirm((root.viewing ? !!root.currentPhoto.trashed : photoLibrary.mode === "trash") ? "permanent" : "trash",root.frozenActionIds()) }
 
     header: Item {
-        height: LiquidStyle.toolbarButtonHeight + 28
-        Rectangle { anchors.fill: parent; color: AppTheme.contentBackground }
+        height: LiquidStyle.toolbarButtonHeight + 32
+        // The toolbar is a floating liquid bar rather than a full-bleed strip:
+        // it insets from every window edge so the header reads as glass laid on
+        // top of the window, matching the sidebar below it.
+        Rectangle {
+            id: toolbarSurface
+            anchors.fill: parent
+            anchors.leftMargin: 12; anchors.rightMargin: 12
+            anchors.topMargin: 8; anchors.bottomMargin: 6
+            radius: 14
+            color: root.glassSurface
+            border.width: 1
+            border.color: root.glassEdge
+        }
         MouseArea {
             anchors.fill: parent; property point origin
             onPressed: mouse => { origin = Qt.point(mouse.x,mouse.y) }
@@ -162,7 +189,7 @@ KosAppWindow {
             onDoubleClicked: root.toggleMaximized()
         }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 12; spacing: 10
+            anchors.fill: toolbarSurface; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 10
             PhotoAction { objectName: "navigationButton"; label: root.viewing ? qsTr("Back to photos") : qsTr("Toggle sidebar"); iconName: root.viewing ? "chevron_left" : "sidebar_left"; onClicked: root.viewing ? root.returnToGallery() : preferences.sidebar = !preferences.sidebar }
             ColumnLayout {
                 Layout.fillWidth: true; Layout.minimumWidth: 60; spacing: 2
@@ -215,14 +242,27 @@ KosAppWindow {
                 }
             }
             RowLayout {
-                Layout.fillWidth: true; Layout.fillHeight: true; spacing: 0
-                LibrarySidebar {
-                    objectName: "librarySidebar"; Layout.preferredWidth: root.width < 850 ? 174 : 194; Layout.fillHeight: true
-                    visible: preferences.sidebar && !root.viewing; browserPage: root.browserPage
-                    onNavigate: (mode, folder) => root.showCollection(mode,folder)
-                    onBrowse: page => root.browse(page)
-                    onAddFolder: dialogs.addFolder()
-                    onFolderActions: (folder,anchor) => { folderMenu.folder = Object.assign({},folder); folderMenu.anchorItem = anchor; folderMenu.openAtAnchor() }
+                Layout.fillWidth: true; Layout.fillHeight: true
+                // Float both the sidebar card and the content away from the
+                // window edges; the gap is what makes the sidebar read as a
+                // panel instead of a column running into the title bar.
+                Layout.leftMargin: 12; Layout.rightMargin: 12; Layout.bottomMargin: 12; Layout.topMargin: 8
+                spacing: 12
+                Item {
+                    id: sidebarSlot
+                    Layout.preferredWidth: root.width < 850 ? 174 : 194; Layout.fillHeight: true
+                    visible: preferences.sidebar && !root.viewing
+                    LibrarySidebar {
+                        id: sidebarPanel
+                        anchors.fill: parent
+                        objectName: "librarySidebar"
+                        surfaceColor: root.glassSurface; edgeColor: root.glassEdge
+                        browserPage: root.browserPage
+                        onNavigate: (mode, folder) => root.showCollection(mode,folder)
+                        onBrowse: page => root.browse(page)
+                        onAddFolder: dialogs.addFolder()
+                        onFolderActions: (folder,anchor) => { folderMenu.folder = Object.assign({},folder); folderMenu.anchorItem = anchor; folderMenu.openAtAnchor() }
+                    }
                 }
                 GalleryView {
                     id: gallery; objectName: "galleryView"; Layout.fillWidth: true; Layout.fillHeight: true; visible: !root.viewing && root.browserPage === "library"
