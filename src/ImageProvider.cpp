@@ -18,9 +18,9 @@ QImage videoPoster(const ImageSource &source)
     const QFileInfo before(source.path);
     if (!before.isFile() || before.isSymLink() || !before.isReadable()
         || before.size() != source.bytes || before.lastModified().toMSecsSinceEpoch() != source.modified) return {};
-    static QSemaphore slots(2);
-    if (!slots.tryAcquire(1, 100)) return {};
-    const auto release = qScopeGuard([&] { slots.release(); });
+    static QSemaphore posterSlots(2);
+    if (!posterSlots.tryAcquire(1, 100)) return {};
+    const auto release = qScopeGuard([&] { posterSlots.release(); });
     const QString executable = QStandardPaths::findExecutable("ffmpeg");
     if (executable.isEmpty()) return {};
     QProcess process;

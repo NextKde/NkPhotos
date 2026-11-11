@@ -75,6 +75,7 @@ private:
     bool commit();
     void rollback();
     bool saveEntry(const PhotoEntry &entry);
+    void generateDateMemories(const std::shared_ptr<std::atomic_bool> &cancel);
     PhotoEntry find(const QString &id);
     QString idForPath(const QString &path);
     bool ownedPath(const QString &path) const;

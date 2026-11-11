@@ -440,7 +440,53 @@ LibrarySnapshot LibraryStore::scanSources(const QStringList &extensions,
             if (ok && !cancel->load()) commit(); else rollback();
         }
     }
+    if(!cancel->load() && m_error.isEmpty())generateDateMemories(cancel);
     return snapshot();
+}
+void LibraryStore::generateDateMemories(const std::shared_ptr<std::atomic_bool> &cancel)
+{
+    // Materialize bounded, local date groups only after a complete successful source scan.
+    // A marker and the memory are committed together; deleting the memory keeps the marker.
+    QSqlQuery candidates(m_db);
+    if(!candidates.exec("SELECT id,date FROM media WHERE media_type='photo' AND hidden=0 AND deleted_at=0 "
+                        "AND tombstone=0 AND available=1 AND date>0 AND (managed=1 OR standalone=1 OR "
+                        "EXISTS(SELECT 1 FROM media_sources WHERE media_id=media.id)) ORDER BY date DESC,id LIMIT 20000")) {
+        m_error=candidates.lastError().text();return;
+    }
+    QHash<QString,QStringList> groups;
+    QStringList dates;
+    while(candidates.next() && !cancel->load()) {
+        const QString date=QDateTime::fromMSecsSinceEpoch(candidates.value(1).toLongLong()).date().toString(Qt::ISODate);
+        if(!groups.contains(date))dates.append(date);
+        // Keep each automatic memory short; the full date collection remains separately available.
+        auto &ids=groups[date];if(ids.size()<200)ids.append(candidates.value(0).toString());
+    }
+    candidates.finish();
+    if(cancel->load() || !begin())return;
+    bool ok=true;
+    int considered=0;
+    for(const auto &date:dates) {
+        QStringList ids=groups.value(date);
+        if(ids.size()<3)continue;
+        if(++considered>12 || cancel->load())break;
+        const QString marker="auto_date_memory/"+date;
+        QSqlQuery existing(m_db);existing.prepare("SELECT 1 FROM settings WHERE key=?");existing.addBindValue(marker);
+        if(!existing.exec()){m_error=existing.lastError().text();ok=false;break;}
+        const bool generated=existing.next();existing.finish();
+        if(generated)continue;
+        std::reverse(ids.begin(),ids.end());
+        const QString id=uuid();
+        ok=execute("INSERT INTO memories(id,name,cover_id,seconds,music,muted,created_at) VALUES(?,?,?,4,'',1,?)",
+                   {id,date,ids.first(),QDateTime::currentMSecsSinceEpoch()});
+        int position=0;
+        for(const auto &mediaId:ids) {
+            if(!ok || cancel->load())break;
+            ok=execute("INSERT INTO memory_members(memory_id,media_id,position) VALUES(?,?,?)",{id,mediaId,position++});
+        }
+        ok=ok && execute("INSERT INTO settings(key,value) VALUES(?,?)",{marker,id});
+        if(!ok)break;
+    }
+    if(ok && !cancel->load())commit();else rollback();
 }
 LibrarySnapshot LibraryStore::addFolder(const QUrl &url)
 {

@@ -25,7 +25,9 @@ browser, not this expansion. [中文](README.zh-CN.md)
   Unsupported codecs produce a visible error rather than a playback guarantee.
 - Create local Memories from selected media or a date group, choose an order and
   cover, set photo duration, and optionally select local music. Playback offers
-  pause, previous/next and fullscreen. This is not person or location recognition.
+  pause, previous/next and fullscreen. Successful scans also generate bounded
+  date-based Memories once per eligible day (three or more photos, up to 12 dates
+  and 200 photos each). This is not person or location recognition.
 
 ## Files, recovery and sharing
 

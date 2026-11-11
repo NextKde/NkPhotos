@@ -32,16 +32,18 @@ Manual acceptance after an authorized VM build / 授权 VM 编译后的人工检
 
 Remaining implementation differences from the approved scope / 尚未完成的范围：
 
-- Memories can be created explicitly from dates or selections; automatic date-recap
-  suggestions are not implemented yet.
+- Automatic date memories are now implemented for up to 12 recent eligible dates,
+  with at least three photos and at most 200 photos each. They are generated once
+  per date after a successful scan; deletion is respected. This remains unexecuted.
 - Indexing remains nonrecursive and capped at 20,000 files or 10 seconds per refresh;
   continuation through larger sources is not implemented. Capture metadata is
   limited to available Qt plugin text and bounded video probing.
 - Recovery/expiry handles at most 100 operations/items at startup; continuous
   cleanup during a long-running session is not implemented.
 
-回忆目前需主动从日期或选择创建，自动日期回顾尚未实现。超大图库的连续索引和长时间
-运行时的持续到期清理也尚未完成；这些不是已经验收的能力。
+回忆支持主动创建，并新增有界的自动日期回顾；尚未运行验收。超大图库的连续索引和长时间
+运行时的持续到期清理尚未完成。自动审批另外拒绝了每小时到期清理改动，理由为不可逆自动删除；
+没有应用该改动，也没有绕过拒绝。
 
 Application-owned screenshot support is implemented in source. No new screenshot
 has been captured. Pending captures must use disposable profiles and synthetic or
