@@ -8,7 +8,13 @@ image plugins are supplied by the runtime. Build only in the designated VM.
 ```sh
 flatpak-builder --user --force-clean --repo=tmp/repo tmp/flatpak-build packaging/flatpak/org.nextks.photos.json
 flatpak build-bundle tmp/repo tmp/org.nextks.photos.flatpak org.nextks.photos
+flatpak install --user tmp/org.nextks.photos.flatpak
+flatpak run org.nextks.photos
 ```
+
+The first development bundle was built, installed and launched in VM 172.20.23.3.
+It is approximately 1.1 MB compressed / 5 MB installed, excluding the shared
+runtime. Exact checks and remaining release gates: [verification](../../docs/Verification.md).
 
 文件夹及图片通过门户选择，不授予全盘或主目录访问、不授予网络访问。
 明确点击“编辑”后，将副本经 Documents portal 授权给 `org.nextkde.nkshot`，
