@@ -7,28 +7,22 @@ import Kos.Ui
 Rectangle {
     id: root
     property string browserPage: "library"
-    property color surfaceColor: AppTheme.contentSecondaryBackground
-    property color edgeColor: AppTheme.withAlpha(AppTheme.text, .07)
     signal navigate(string mode, url folder)
     signal browse(string page)
     signal addFolder()
     signal folderActions(var folder, Item anchor)
-    color: surfaceColor
-    // Floating card, not a full-height column: rounded corners plus a hairline
-    // rim keep it readable over the window background.
-    radius: AppTheme.mediumRadius
-    border.width: 1
-    border.color: edgeColor
-    clip: true
+    // The sidebar column is a flush surface owned by the shell (see
+    // Main.qml's sidebarPlane); this control only carries the rows.
+    color: "transparent"
     ScrollView {
         anchors.fill: parent; anchors.margins: 10
         // ScrollView paints an opaque palette-window background by default,
-        // which would cover the card surface declared on the root rectangle.
+        // which would cover the surface underneath.
         background: null
         clip: true; contentWidth: availableWidth
         ColumnLayout {
             width: parent.width; spacing: 2
-            Label { text: qsTr("Library"); color: AppTheme.mutedText; font.pixelSize: 11; Layout.leftMargin: 12; Layout.topMargin: 4; Layout.bottomMargin: 8 }
+            Label { text: qsTr("Library"); color: AppTheme.mutedText; font.pixelSize: 11; Layout.leftMargin: 12; Layout.topMargin: 8; Layout.bottomMargin: 8 }
             Repeater {
                 model: [
                     {key:"all",title:qsTr("All photos"),symbol:"photo_on_rectangle"},

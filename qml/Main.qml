@@ -13,15 +13,6 @@ KosAppWindow {
     width: preferences.windowWidth; height: preferences.windowHeight
     minimumWidth: 740; minimumHeight: 480
     title: viewing && currentPhoto.name ? currentPhoto.name + " — NkPhotos" : "NkPhotos"
-    // A slightly deepened, vertically graded backdrop gives the floating
-    // toolbar and sidebar something to lift off of. On a flat fill both panels
-    // read as part of one slab instead of lying on top of the window.
-    background: Rectangle {
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: AppTheme.dark ? "#232329" : "#F8F8FB" }
-            GradientStop { position: 1.0; color: AppTheme.dark ? "#131316" : "#ECECF1" }
-        }
-    }
     // Presentation-only state is addressable by the native screenshot option.
     property bool viewing: false
     property bool infoVisible: false
@@ -40,8 +31,9 @@ KosAppWindow {
     // Both sit on top of the window background, so they need to lift off it
     // rather than disappear into it — hence the lightened fill plus a hairline
     // rim instead of a hard border.
-    readonly property color glassSurface: AppTheme.dark ? "#2C2C31" : "#FBFBFD"
-    readonly property color glassEdge: AppTheme.dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.06)
+    readonly property int sidebarWidth: width < 850 ? 174 : 194
+    readonly property int headerHeight: LiquidStyle.toolbarButtonHeight + 20
+    readonly property bool sidebarShown: preferences.sidebar && !viewing
     readonly property bool popupOpen: infoPopup.visible || addMenu.visible || viewMenu.visible || moreMenu.visible || appearanceMenu.visible || folderMenu.visible || collectionMenu.visible || actionMenu.visible || dialogs.anyOpen || memoryEditor.visible || memoryEditor.pickerOpen
     readonly property string collectionTitle: browserPage === "albums" ? qsTr("Albums") : browserPage === "memories" ? qsTr("Memories")
         : photoLibrary.mode === "favorites" ? qsTr("Favorites") : photoLibrary.mode === "recent" ? qsTr("Recent imports")
@@ -167,61 +159,41 @@ KosAppWindow {
     Shortcut { sequences: [StandardKey.SelectAll]; enabled: !root.viewing && root.browserPage === "library" && !root.popupOpen && !search.activeFocus; onActivated: { photoLibrary.dateView = "all"; photoLibrary.selectAll() } }
     Shortcut { sequence: "Delete"; enabled: !root.popupOpen && !search.activeFocus && (root.viewing || root.browserPage === "library") && root.frozenActionIds().length > 0 && !root.frozenActionIds().some(id => photoLibrary.entry(id).temporary); onActivated: dialogs.confirm((root.viewing ? !!root.currentPhoto.trashed : photoLibrary.mode === "trash") ? "permanent" : "trash",root.frozenActionIds()) }
 
-    header: Item {
-        height: LiquidStyle.toolbarButtonHeight + 32
-        // The toolbar is a floating liquid bar rather than a full-bleed strip:
-        // it insets from every window edge so the header reads as glass laid on
-        // top of the window, matching the sidebar below it.
-        Rectangle {
-            id: toolbarSurface
-            anchors.fill: parent
-            anchors.leftMargin: 12; anchors.rightMargin: 12
-            anchors.topMargin: 8; anchors.bottomMargin: 6
-            radius: 14
-            color: root.glassSurface
-            border.width: 1
-            border.color: root.glassEdge
-        }
-        MouseArea {
-            anchors.fill: parent; property point origin
-            onPressed: mouse => { origin = Qt.point(mouse.x,mouse.y) }
-            onPositionChanged: mouse => { if (pressed && (Math.abs(mouse.x-origin.x)>5 || Math.abs(mouse.y-origin.y)>5)) root.startSystemMove() }
-            onDoubleClicked: root.toggleMaximized()
-        }
-        RowLayout {
-            anchors.fill: toolbarSurface; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 10
-            PhotoAction { objectName: "navigationButton"; label: root.viewing ? qsTr("Back to photos") : qsTr("Toggle sidebar"); iconName: root.viewing ? "chevron_left" : "sidebar_left"; onClicked: root.viewing ? root.returnToGallery() : preferences.sidebar = !preferences.sidebar }
-            ColumnLayout {
-                Layout.fillWidth: true; Layout.minimumWidth: 60; spacing: 2
-                Label { Layout.fillWidth: true; elide: Text.ElideMiddle; textFormat: Text.PlainText; text: root.viewing ? (root.memoryPlaying ? root.playbackMemory.name : root.currentPhoto.title || root.currentPhoto.name || qsTr("Item unavailable")) : root.collectionTitle; color: AppTheme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
-                Label { visible: root.viewing; text: qsTr("%1 of %2").arg(root.memoryPlaying ? root.playbackIndex+1 : photoLibrary.selectedIndex+1).arg(root.memoryPlaying ? root.playbackItems.length : photoLibrary.count); color: AppTheme.mutedText; font.pixelSize: 11 }
-            }
-            LiquidTextField {
-                id: search; objectName: "filenameSearch"; visible: !root.viewing && root.browserPage === "library"
-                Layout.preferredWidth: root.width < 850 ? 142 : 200
-                materialForm: true; placeholderText: qsTr("Search photos"); text: photoLibrary.search; onTextEdited: photoLibrary.search = text
-                Accessible.name: qsTr("Search names, descriptions, keywords and dates")
-                onAccepted: { if (photoLibrary.selectedIndex < 0) photoLibrary.select(0); root.openSelected() }
-                Keys.onEscapePressed: { photoLibrary.search = ""; gallery.grid.forceActiveFocus() }
-            }
-            RowLayout {
-                spacing: 4
-                PhotoAction { id: addButton; objectName: "addButton"; visible: !root.viewing; label: qsTr("Add photos"); iconName: "plus"; onClicked: addMenu.openAtAnchor() }
-                PhotoAction { id: viewButton; objectName: "viewOptionsButton"; visible: !root.viewing && root.browserPage === "library"; label: qsTr("View options"); iconName: "slider_horizontal_3"; onClicked: viewMenu.openAtAnchor() }
-                PhotoAction { objectName: "favoriteButton"; visible: root.viewing; label: root.currentPhoto.favorite ? qsTr("Unfavorite") : qsTr("Favorite"); iconName: "heart"; iconFilled: !!root.currentPhoto.favorite; enabled: !!root.currentPhoto.name && !root.currentPhoto.trashed && !root.currentPhoto.temporary; onClicked: root.toggleCurrentFavorite() }
-                PhotoAction { id: infoButton; objectName: "infoButton"; visible: root.viewing; label: qsTr("Information"); iconName: "info_circle"; iconFilled: infoPopup.visible; onClicked: root.infoVisible = !root.infoVisible }
-                LiquidActionButton { objectName: "editButton"; visible: root.viewing && root.currentPhoto.mediaType === "photo"; enabled: root.currentPhoto.available && !root.currentPhoto.trashed && !editorBridge.busy; toolbarAction: true; materialForm: true; text: editorBridge.busy ? qsTr("Preparing…") : qsTr("Edit…"); Accessible.name: qsTr("Edit a copy in NkShot"); onClicked: dialogs.editItem(root.currentPhoto) }
-                PhotoAction { id: itemActionsButton; objectName: "itemActionsButton"; visible: root.viewing; label: qsTr("Photo actions"); iconName: "square_arrow_up"; onClicked: root.showActions(itemActionsButton) }
-                PhotoAction { id: moreButton; objectName: "moreButton"; label: qsTr("More actions"); iconName: "ellipsis"; onClicked: moreMenu.openAtAnchor() }
-            }
-            Rectangle { width: 1; height: 18; color: AppTheme.withAlpha(AppTheme.text,.10) }
-            KosWindowControls { targetWindow: root; actions: root.windowActions; maximizeMode: true; circleSize: 14; buttonWidth: 22; buttonHeight: 22; spacing: 6 }
-        }
-    }
+    // Window chrome is drawn inside the scene rather than through
+    // ApplicationWindow's header. The sidebar surface has to reach the top edge
+    // of the window, which a full-width header band with its own background
+    // cannot do — the same shell contract NkMail and KMusic use.
+    header: null
     Item {
         id: scene; anchors.fill: parent
+        // Flush planes: one continuous sidebar surface running the full height
+        // of the window, one content surface, a hairline rule between them.
+        // No insets and no rounded cards — the sidebar is part of the window,
+        // not a panel lying on top of it.
+        Rectangle {
+            id: sidebarPlane
+            objectName: "sidebarPlane"
+            anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+            width: root.sidebarShown ? root.sidebarWidth : 0
+            // One step above the content surface so the column reads as a
+            // separate plane; the hairline rule alone is too subtle in dark.
+            color: AppTheme.dark ? "#2A2A2C" : AppTheme.contentSecondaryBackground
+        }
+        Rectangle {
+            objectName: "contentPlane"
+            anchors.left: sidebarPlane.right; anchors.right: parent.right
+            anchors.top: parent.top; anchors.bottom: parent.bottom
+            color: AppTheme.contentBackground
+            Rectangle {
+                anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                width: root.sidebarShown ? 1 : 0
+                color: AppTheme.withAlpha(AppTheme.text, .10)
+            }
+        }
         ColumnLayout {
             anchors.fill: parent; spacing: 0
+            // Leave the top band to the shell header drawn below.
+            anchors.topMargin: root.headerHeight
             Rectangle {
                 Layout.fillWidth: true; implicitHeight: Math.max(40,notice.implicitHeight+20)
                 visible: !!photoLibrary.message || !!editorBridge.message || !!shareBridge.message
@@ -242,21 +214,15 @@ KosAppWindow {
                 }
             }
             RowLayout {
-                Layout.fillWidth: true; Layout.fillHeight: true
-                // Float both the sidebar card and the content away from the
-                // window edges; the gap is what makes the sidebar read as a
-                // panel instead of a column running into the title bar.
-                Layout.leftMargin: 12; Layout.rightMargin: 12; Layout.bottomMargin: 12; Layout.topMargin: 8
-                spacing: 12
+                Layout.fillWidth: true; Layout.fillHeight: true; spacing: 0
                 Item {
                     id: sidebarSlot
-                    Layout.preferredWidth: root.width < 850 ? 174 : 194; Layout.fillHeight: true
-                    visible: preferences.sidebar && !root.viewing
+                    Layout.preferredWidth: root.sidebarWidth; Layout.fillHeight: true
+                    visible: root.sidebarShown
                     LibrarySidebar {
                         id: sidebarPanel
                         anchors.fill: parent
                         objectName: "librarySidebar"
-                        surfaceColor: root.glassSurface; edgeColor: root.glassEdge
                         browserPage: root.browserPage
                         onNavigate: (mode, folder) => root.showCollection(mode,folder)
                         onBrowse: page => root.browse(page)
@@ -266,6 +232,8 @@ KosAppWindow {
                 }
                 GalleryView {
                     id: gallery; objectName: "galleryView"; Layout.fillWidth: true; Layout.fillHeight: true; visible: !root.viewing && root.browserPage === "library"
+                    // Content breathes away from the sidebar rule and the window edge.
+                    Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 8; Layout.bottomMargin: 8
                     tileSize: preferences.tileSize; showNames: preferences.showNames; cropThumbnails: preferences.cropThumbnails
                     onOpenSelected: root.openSelected()
                     onAddFolder: dialogs.addFolder()
@@ -278,6 +246,7 @@ KosAppWindow {
                 }
                 CollectionBrowser {
                     objectName: "collectionBrowser"; Layout.fillWidth: true; Layout.fillHeight: true; visible: !root.viewing && root.browserPage !== "library"
+                    Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 8; Layout.bottomMargin: 8
                     memories: root.browserPage === "memories"
                     onOpenCollection: collection => memories ? root.showMemory(collection.id) : root.showAlbum(collection.id)
                     onCollectionActions: (collection,anchor) => root.showCollectionActions(collection,anchor,memories)
@@ -293,6 +262,92 @@ KosAppWindow {
                     onAdvance: { if (root.playbackIndex + 1 < root.playbackItems.length) root.playbackIndex++; else if (loop) root.playbackIndex = 0 }
                     onFinished: root.returnToGallery()
                 }
+            }
+        }
+        // Shell header: floats above both planes, but has no surface of its own.
+        // Its left segment sits inside the sidebar column, so the collection
+        // title belongs to the sidebar the way NkMail's "Mail" does.
+        Item {
+            id: shellHeader
+            objectName: "shellHeader"
+            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+            height: root.headerHeight
+            z: 5
+
+            // Drag surface first so every control declared later wins the click.
+            MouseArea {
+                anchors.fill: parent; property point origin
+                onPressed: mouse => { origin = Qt.point(mouse.x,mouse.y) }
+                onPositionChanged: mouse => { if (pressed && (Math.abs(mouse.x-origin.x)>5 || Math.abs(mouse.y-origin.y)>5)) root.startSystemMove() }
+                onDoubleClicked: root.toggleMaximized()
+            }
+
+            Item {
+                id: sidebarHeader
+                objectName: "sidebarHeader"
+                width: root.sidebarShown ? root.sidebarWidth : 0
+                height: parent.height
+                visible: width > 0
+                Label {
+                    anchors.left: parent.left; anchors.leftMargin: 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - 16 - 8 - collapseButton.width - 8)
+                    elide: Text.ElideMiddle; textFormat: Text.PlainText
+                    text: root.collectionTitle
+                    color: AppTheme.text; font.pixelSize: 14; font.weight: Font.DemiBold
+                }
+                PhotoAction {
+                    id: collapseButton
+                    objectName: "sidebarToggleButton"
+                    anchors.right: parent.right; anchors.rightMargin: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: qsTr("Hide sidebar"); iconName: "sidebar_left"
+                    onClicked: preferences.sidebar = false
+                }
+            }
+
+            RowLayout {
+                anchors.left: sidebarHeader.right; anchors.right: parent.right
+                anchors.top: parent.top; anchors.bottom: parent.bottom
+                anchors.leftMargin: root.sidebarShown ? 12 : 8
+                anchors.rightMargin: 12
+                spacing: 10
+                // With the sidebar hidden (viewer, or collapsed by hand) the
+                // navigation control and the title move back into this row.
+                PhotoAction {
+                    objectName: "navigationButton"
+                    visible: !root.sidebarShown
+                    label: root.viewing ? qsTr("Back to photos") : qsTr("Show sidebar")
+                    iconName: root.viewing ? "chevron_left" : "sidebar_left"
+                    onClicked: root.viewing ? root.returnToGallery() : preferences.sidebar = true
+                }
+                ColumnLayout {
+                    visible: !root.sidebarShown
+                    Layout.fillWidth: true; Layout.minimumWidth: 60; spacing: 2
+                    Label { Layout.fillWidth: true; elide: Text.ElideMiddle; textFormat: Text.PlainText; text: root.viewing ? (root.memoryPlaying ? root.playbackMemory.name : root.currentPhoto.title || root.currentPhoto.name || qsTr("Item unavailable")) : root.collectionTitle; color: AppTheme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                    Label { visible: root.viewing; text: qsTr("%1 of %2").arg(root.memoryPlaying ? root.playbackIndex+1 : photoLibrary.selectedIndex+1).arg(root.memoryPlaying ? root.playbackItems.length : photoLibrary.count); color: AppTheme.mutedText; font.pixelSize: 11 }
+                }
+                Item { Layout.fillWidth: true; visible: root.sidebarShown }
+                LiquidTextField {
+                    id: search; objectName: "filenameSearch"; visible: !root.viewing && root.browserPage === "library"
+                    Layout.preferredWidth: root.width < 850 ? 142 : 200
+                    materialForm: true; placeholderText: qsTr("Search photos"); text: photoLibrary.search; onTextEdited: photoLibrary.search = text
+                    Accessible.name: qsTr("Search names, descriptions, keywords and dates")
+                    onAccepted: { if (photoLibrary.selectedIndex < 0) photoLibrary.select(0); root.openSelected() }
+                    Keys.onEscapePressed: { photoLibrary.search = ""; gallery.grid.forceActiveFocus() }
+                }
+                RowLayout {
+                    spacing: 4
+                    PhotoAction { id: addButton; objectName: "addButton"; visible: !root.viewing; label: qsTr("Add photos"); iconName: "plus"; onClicked: addMenu.openAtAnchor() }
+                    PhotoAction { id: viewButton; objectName: "viewOptionsButton"; visible: !root.viewing && root.browserPage === "library"; label: qsTr("View options"); iconName: "slider_horizontal_3"; onClicked: viewMenu.openAtAnchor() }
+                    PhotoAction { objectName: "favoriteButton"; visible: root.viewing; label: root.currentPhoto.favorite ? qsTr("Unfavorite") : qsTr("Favorite"); iconName: "heart"; iconFilled: !!root.currentPhoto.favorite; enabled: !!root.currentPhoto.name && !root.currentPhoto.trashed && !root.currentPhoto.temporary; onClicked: root.toggleCurrentFavorite() }
+                    PhotoAction { id: infoButton; objectName: "infoButton"; visible: root.viewing; label: qsTr("Information"); iconName: "info_circle"; iconFilled: root.infoVisible; onClicked: root.infoVisible = !root.infoVisible }
+                    LiquidActionButton { objectName: "editButton"; visible: root.viewing && root.currentPhoto.mediaType === "photo"; enabled: root.currentPhoto.available && !root.currentPhoto.trashed && !editorBridge.busy; toolbarAction: true; materialForm: true; text: editorBridge.busy ? qsTr("Preparing…") : qsTr("Edit…"); Accessible.name: qsTr("Edit a copy in NkShot"); onClicked: dialogs.editItem(root.currentPhoto) }
+                    PhotoAction { id: itemActionsButton; objectName: "itemActionsButton"; visible: root.viewing; label: qsTr("Photo actions"); iconName: "square_arrow_up"; onClicked: root.showActions(itemActionsButton) }
+                    PhotoAction { id: moreButton; objectName: "moreButton"; label: qsTr("More actions"); iconName: "ellipsis"; onClicked: moreMenu.openAtAnchor() }
+                }
+                Rectangle { width: 1; height: 18; color: AppTheme.withAlpha(AppTheme.text,.10) }
+                KosWindowControls { targetWindow: root; actions: root.windowActions; maximizeMode: true; circleSize: 14; buttonWidth: 22; buttonHeight: 22; spacing: 6 }
             }
         }
         DropArea { anchors.fill: parent; onDropped: drop => { if (drop.hasUrls) { photoLibrary.openFiles(drop.urls); drop.acceptProposedAction() } } }
