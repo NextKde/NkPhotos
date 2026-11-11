@@ -10,6 +10,7 @@ struct ImageSource {
     QString path;
     qint64 bytes = 0;
     qint64 modified = 0;
+    bool operator==(const ImageSource &) const = default;
 };
 struct ImageRegistry {
     QReadWriteLock lock;

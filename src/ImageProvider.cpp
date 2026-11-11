@@ -6,6 +6,50 @@
 #include <QImageReader>
 #include <QColorSpace>
 #include <QImageIOHandler>
+#include <QProcess>
+#include <QStandardPaths>
+#include <QSemaphore>
+#include <QElapsedTimer>
+#include <QScopeGuard>
+
+namespace {
+QImage videoPoster(const ImageSource &source)
+{
+    const QFileInfo before(source.path);
+    if (!before.isFile() || before.isSymLink() || !before.isReadable()
+        || before.size() != source.bytes || before.lastModified().toMSecsSinceEpoch() != source.modified) return {};
+    static QSemaphore slots(2);
+    if (!slots.tryAcquire(1, 100)) return {};
+    const auto release = qScopeGuard([&] { slots.release(); });
+    const QString executable = QStandardPaths::findExecutable("ffmpeg");
+    if (executable.isEmpty()) return {};
+    QProcess process;
+    process.setStandardErrorFile(QProcess::nullDevice());
+    process.start(executable, {"-nostdin", "-v", "error", "-threads", "1",
+        "-protocol_whitelist", "file,pipe", "-i", source.path,
+        "-map", "0:v:0", "-frames:v", "1", "-an", "-sn", "-dn",
+        "-vf", "scale=384:384:force_original_aspect_ratio=decrease",
+        "-threads", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1"});
+    if (!process.waitForStarted(1000)) return {};
+    QElapsedTimer timer;
+    timer.start();
+    QByteArray bytes;
+    while (process.state() != QProcess::NotRunning && timer.elapsed() < 5000) {
+        process.waitForReadyRead(50);
+        bytes += process.readAllStandardOutput();
+        if (bytes.size() > 2 * 1024 * 1024) break;
+    }
+    if (process.state() != QProcess::NotRunning) {
+        process.kill(); process.waitForFinished(1000); return {};
+    }
+    bytes += process.readAllStandardOutput();
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0
+        || bytes.size() > 2 * 1024 * 1024) return {};
+    QFileInfo after(source.path);
+    if (after.size() != source.bytes || after.lastModified().toMSecsSinceEpoch() != source.modified) return {};
+    return QImage::fromData(bytes, "PNG");
+}
+}
 
 ImageProvider::ImageProvider(std::shared_ptr<ImageRegistry> registry)
     : QQuickImageProvider(Image, ForceAsynchronousImageLoading), m_registry(std::move(registry)) {}
@@ -65,7 +109,9 @@ QImage ImageProvider::requestImage(const QString &id, QSize *size, const QSize &
             return *cached;
         }
     }
-    QImage image = decode(source, target);
+    const QString extension = QFileInfo(source.path).suffix().toLower();
+    static const QStringList videoExtensions{"mp4", "m4v", "mov", "mkv", "webm", "avi", "ogv", "mpeg", "mpg", "3gp", "mts", "m2ts"};
+    QImage image = videoExtensions.contains(extension) ? videoPoster(source) : decode(source, target);
     if (size) *size = image.size();
     if (thumbnail && !image.isNull()) {
         QMutexLocker locker(&m_cacheMutex);

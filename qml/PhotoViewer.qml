@@ -2,90 +2,157 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtMultimedia
 import Kos.Ui
 
 FocusScope {
     id: root
     required property var photo
-    property bool showInfo: false
     property int position: -1
     property int total: 0
+    property bool slideshowEnabled: false
+    property bool playing: false
+    property real intervalSeconds: 5
+    property url musicUrl
+    property bool musicMuted: false
+    property bool loop: false
+    readonly property bool isVideo: photo && photo.mediaType === "video"
+    readonly property string musicError: musicUrl.toString() && !musicUrl.toString().startsWith("file:")
+        ? qsTr("Choose a local music file for the slideshow.") : music.errorString
     signal previous()
     signal next()
-    Keys.onLeftPressed: previous()
-    Keys.onRightPressed: next()
-    Keys.onSpacePressed: next()
+    signal advance()
+    signal finished()
+    Shortcut {
+        sequence: "Space"
+        enabled: root.visible && root.activeFocus
+        onActivated: root.togglePlayback()
+    }
+    function togglePlayback() {
+        if (slideshowEnabled) playing = !playing
+        else if (isVideo) video.togglePlayback()
+        else next()
+    }
+    function stopSlideshow() { playing = false; slideshowEnabled = false; music.stop(); video.stop() }
+    function advanceSlideshow() {
+        if (!visible || !slideshowEnabled || !playing) return
+        if (position >= 0 && (position + 1 < total || loop)) {
+            advance()
+            // A one-item looping collection keeps the same source URL.
+            if (loop && total === 1 && isVideo) video.play()
+        } else { playing = false; finished() }
+    }
+    onVisibleChanged: if (!visible) stopSlideshow()
+    onSlideshowEnabledChanged: if (!slideshowEnabled) { playing = false; music.stop() }
+    onPlayingChanged: {
+        if (playing && !slideshowEnabled) slideshowEnabled = true
+        if (playing && visible && music.source.toString()) music.play()
+        else music.stop()
+    }
+    onPhotoChanged: slideTimer.restartIfReady()
+    Component.onDestruction: music.stop()
+    Timer {
+        id: slideTimer
+        interval: Math.max(1, root.intervalSeconds) * 1000
+        repeat: true
+        running: root.visible && root.slideshowEnabled && root.playing && !root.isVideo && picture.status === Image.Ready
+        function restartIfReady() { if (running) restart() }
+        onTriggered: root.advanceSlideshow()
+    }
+    MediaPlayer {
+        id: music
+        source: root.visible && root.slideshowEnabled && root.musicUrl.toString().startsWith("file:") ? root.musicUrl : ""
+        loops: MediaPlayer.Infinite
+        audioOutput: AudioOutput { muted: root.musicMuted || root.isVideo }
+        onSourceChanged: {
+            stop()
+            if (root.playing && source.toString()) play()
+        }
+        onMediaStatusChanged: if (mediaStatus === MediaPlayer.LoadedMedia && root.playing) play()
+    }
     function zoom(factor) {
-        if (picture.status !== Image.Ready) return
+        if (isVideo || picture.status !== Image.Ready || area.contentWidth <= 0 || area.contentHeight <= 0) return
+        // Keep the image point beneath the viewport centre stable after panning.
+        const x = (area.width/2-area.contentX)/area.contentWidth
+        const y = (area.height/2-area.contentY)/area.contentHeight
         area.leaveAutoFit()
         const size = area.multiplyContentSize(factor)
         area.contentWidth = size.width; area.contentHeight = size.height
-        area.contentX = area.centerContentX(); area.contentY = area.centerContentY()
+        area.contentX = area.boundedContentX(area.width/2-x*size.width,size.width)
+        area.contentY = area.boundedContentY(area.height/2-y*size.height,size.height)
     }
-    RowLayout {
-        anchors.fill: parent; spacing: 0
-        Item {
-            Layout.fillWidth: true; Layout.fillHeight: true
-            Rectangle { anchors.fill: parent; color: AppTheme.dark ? "#101114" : "#eef0f3" }
-            ZoomArea {
-                id: area
-                objectName: "zoomArea"
-                anchors.fill: parent; anchors.bottomMargin: 64; anchors.margins: 16
-                implicitContentWidth: picture.implicitWidth
-                implicitContentHeight: picture.implicitHeight
-                maximumZoomFactor: 16
-                Image {
-                    id: picture
-                    objectName: "fullImage"
-                    anchors.fill: parent
-                    source: root.visible && root.photo.imageSource ? root.photo.imageSource + "/full" : ""
-                    sourceSize: Qt.size(4096,4096)
-                    asynchronous: true; cache: false
-                    fillMode: Image.PreserveAspectFit
-                    onStatusChanged: if (status === Image.Ready) area.resetToDefaultSize()
-                }
-            }
-            ColumnLayout {
-                anchors.centerIn: parent; width: Math.min(380,parent.width - 40); spacing: 12
-                visible: picture.status === Image.Error || !root.photo.imageSource
-                Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: qsTr("Image unavailable"); color: AppTheme.text; font.pixelSize: 22 }
-                Label {
-                    Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter
-                    text: qsTr("The file may have moved, be unsupported, or exceed the safe preview limit. Reopen it or refresh the folder.")
-                    color: AppTheme.mutedText
-                }
-            }
-            BusyIndicator { anchors.centerIn: parent; running: picture.status === Image.Loading; visible: running }
-            RowLayout {
-                anchors.bottom: parent.bottom; anchors.bottomMargin: 16
-                anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
-                LiquidActionButton { text: "‹"; Accessible.name: qsTr("Previous image"); materialForm: true; enabled: root.position > 0; onClicked: root.previous() }
-                Label { text: root.position >= 0 ? (root.position + 1) + " / " + root.total : "—"; color: AppTheme.mutedText; Layout.minimumWidth: 58; horizontalAlignment: Text.AlignHCenter }
-                LiquidActionButton { text: "›"; Accessible.name: qsTr("Next image"); materialForm: true; enabled: root.position >= 0 && root.position + 1 < root.total; onClicked: root.next() }
-                LiquidActionButton { text: "−"; Accessible.name: qsTr("Zoom out"); materialForm: true; onClicked: root.zoom(.8) }
-                LiquidActionButton { text: qsTr("Fit"); materialForm: true; onClicked: area.resetToDefaultSize() }
-                LiquidActionButton { text: "+"; Accessible.name: qsTr("Zoom in"); materialForm: true; onClicked: root.zoom(1.25) }
+    function fit() { area.resetToDefaultSize() }
+    Rectangle { anchors.fill: parent; color: AppTheme.dark ? "#111113" : "#f7f7f7" }
+    ZoomArea {
+        id: area; objectName: "zoomArea"
+        visible: !root.isVideo
+        anchors.fill: parent; anchors.margins: 20; anchors.bottomMargin: root.slideshowEnabled ? 108 : 64
+        implicitContentWidth: picture.implicitWidth
+        implicitContentHeight: picture.implicitHeight
+        maximumZoomFactor: 16
+        Image {
+            id: picture; objectName: "fullImage"
+            anchors.fill: parent
+            source: root.visible && !root.isVideo && root.photo && root.photo.imageSource ? root.photo.imageSource + "/full" : ""
+            sourceSize: Qt.size(4096,4096)
+            asynchronous: true; cache: false; retainWhileLoading: false
+            fillMode: Image.PreserveAspectFit
+            onSourceChanged: area.resetToDefaultSize()
+            onStatusChanged: {
+                if (status === Image.Ready) area.resetToDefaultSize()
+                else if (status === Image.Error && root.slideshowEnabled) root.playing = false
             }
         }
-        Rectangle {
-            Layout.preferredWidth: 228; Layout.fillHeight: true; visible: root.showInfo
-            color: AppTheme.contentSecondaryBackground
-            ScrollView {
-                anchors.fill: parent; anchors.margins: 20; clip: true
-                contentWidth: availableWidth
-                ColumnLayout {
-                width: parent.width; spacing: 14
-                Label { text: qsTr("Image information"); color: AppTheme.text; font.weight: Font.DemiBold; font.pixelSize: 15 }
-                Label { Layout.fillWidth: true; text: root.photo.name || ""; color: AppTheme.text; wrapMode: Text.WrapAnywhere; textFormat: Text.PlainText }
-                Label { text: qsTr("File size"); color: AppTheme.mutedText; font.pixelSize: 11 }
-                Label { text: root.photo.bytes === undefined ? "—" : (root.photo.bytes / 1048576).toFixed(2) + " MB"; color: AppTheme.text }
-                Label { text: qsTr("Modified"); color: AppTheme.mutedText; font.pixelSize: 11 }
-                Label { Layout.fillWidth: true; text: root.photo.modified ? Qt.formatDateTime(root.photo.modified, Qt.DefaultLocaleShortDate) : "—"; color: AppTheme.text; wrapMode: Text.Wrap }
-                Label { text: qsTr("Location"); color: AppTheme.mutedText; font.pixelSize: 11 }
-                Label { Layout.fillWidth: true; text: root.photo.path || ""; textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; color: AppTheme.text; font.pixelSize: 11 }
-                Label { Layout.fillWidth: true; text: qsTr("Large images use a reduced preview. Editing in NkShot creates a separate copy."); wrapMode: Text.Wrap; color: AppTheme.mutedText; font.pixelSize: 11 }
-                }
+    }
+    VideoViewer {
+        id: video
+        anchors.fill: parent; anchors.margins: 20; anchors.bottomMargin: root.slideshowEnabled ? 108 : 64
+        visible: root.isVideo
+        active: root.visible && root.isVideo
+        source: root.isVideo ? root.photo.url || "" : ""
+        autoPlay: root.slideshowEnabled && root.playing
+        onPlaybackFinished: root.advanceSlideshow()
+        onPlaybackFailed: if (root.slideshowEnabled) root.playing = false
+        onPlaybackToggled: playing => { if (root.slideshowEnabled) root.playing = playing }
+    }
+    ColumnLayout {
+        anchors.centerIn: area; width: Math.min(380,area.width-40); spacing: 12
+        visible: !root.isVideo && (picture.status === Image.Error || !root.photo || !root.photo.imageSource)
+        VectorIcon { Layout.alignment: Qt.AlignHCenter; name: "photo"; size: 36; color: AppTheme.mutedText }
+        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: qsTr("Image unavailable"); color: AppTheme.text; font.pixelSize: 21 }
+        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter; text: qsTr("The file may have moved, be unsupported, or exceed the safe preview limit. Reopen it or refresh the folder."); color: AppTheme.mutedText; font.pixelSize: 13 }
+    }
+    BusyIndicator { anchors.centerIn: area; running: !root.isVideo && picture.status === Image.Loading; visible: running }
+    SlideshowControls {
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: 44
+        height: 44; visible: root.slideshowEnabled
+        playing: root.playing; intervalSeconds: root.intervalSeconds; muted: root.musicMuted
+        hasMusic: !!root.musicUrl.toString(); errorMessage: root.musicError
+        onTogglePlayback: root.togglePlayback()
+        onIntervalEdited: seconds => root.intervalSeconds = seconds
+        onToggleMuted: root.musicMuted = !root.musicMuted
+        onStop: { root.stopSlideshow(); root.finished() }
+    }
+    Rectangle {
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+        height: 44; color: AppTheme.contentBackground
+        RowLayout {
+            anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16; spacing: 6
+            PhotoAction { objectName: "previousButton"; label: qsTr("Previous image"); iconName: "chevron_left"; enabled: root.position > 0; onClicked: root.previous() }
+            PhotoAction { objectName: "nextButton"; label: qsTr("Next image"); iconName: "chevron_right"; enabled: root.position >= 0 && root.position+1 < root.total; onClicked: root.next() }
+            Item { Layout.fillWidth: true }
+            PhotoAction { objectName: "zoomOutButton"; visible: !root.isVideo; label: qsTr("Zoom out"); iconName: "minus"; enabled: picture.status === Image.Ready; onClicked: root.zoom(.8) }
+            LiquidActionButton {
+                id: fitButton; objectName: "fitButton"
+                visible: !root.isVideo
+                text: area.autoFit ? qsTr("Fit") : Math.round(area.zoomFactor*100)+"%"
+                toolbarAction: true; materialForm: true; flat: true
+                enabled: picture.status === Image.Ready
+                Accessible.name: qsTr("Fit image to window")
+                onClicked: root.fit()
+                KosToolTip { target: fitButton; text: qsTr("Fit image to window. Zoom is relative to the preview.") }
             }
+            PhotoAction { objectName: "zoomInButton"; visible: !root.isVideo; label: qsTr("Zoom in"); iconName: "plus"; enabled: picture.status === Image.Ready; onClicked: root.zoom(1.25) }
         }
     }
 }

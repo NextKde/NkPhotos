@@ -2,20 +2,27 @@ cmake_minimum_required(VERSION 3.21)
 project(NkPhotos VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Concurrent DBus LinguistTools)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2 Concurrent DBus Sql Multimedia LinguistTools)
 qt_standard_project_setup(REQUIRES 6.8)
 include(GNUInstallDirs)
 add_subdirectory(third_party/nextkdeAppDemo/shared/qml kos-ui)
 qt_add_library(photos_core STATIC
     src/PhotoLibrary.cpp src/PhotoLibrary.h
     src/ImageProvider.cpp src/ImageProvider.h
-    src/EditorBridge.cpp src/EditorBridge.h)
-target_link_libraries(photos_core PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Concurrent Qt6::DBus)
+    src/EditorBridge.cpp src/EditorBridge.h
+    src/LibraryStore.cpp src/LibraryStore.h
+    src/ShareBridge.cpp src/ShareBridge.h)
+target_link_libraries(photos_core PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Concurrent Qt6::DBus Qt6::Sql Qt6::Multimedia)
 target_include_directories(photos_core PUBLIC src)
-qt_add_executable(nkphotos src/main.cpp src/Instance.h)
+qt_add_executable(nkphotos src/main.cpp src/Instance.h src/ScreenshotCapture.cpp src/ScreenshotCapture.h)
 qt_add_library(photos_ui STATIC)
 qt_add_qml_module(photos_ui URI Nk.Photos VERSION 1.0 RESOURCE_PREFIX /qt/qml
-    QML_FILES qml/Main.qml qml/PhotoViewer.qml qml/ZoomArea.qml)
+    QML_FILES qml/Main.qml qml/PhotoViewer.qml qml/ZoomArea.qml
+        qml/PhotoAction.qml qml/LibraryRow.qml qml/GalleryView.qml
+        qml/VideoViewer.qml qml/SlideshowControls.qml
+        qml/LibrarySidebar.qml qml/DateBrowser.qml qml/CollectionBrowser.qml
+        qml/LibraryDialog.qml qml/LibraryDialogs.qml qml/MemoryEditor.qml
+        qml/MediaInfoPanel.qml qml/LibraryActionMenu.qml)
 target_link_libraries(photos_ui PUBLIC Kos::Ui Kos::UiPlugin Qt6::QuickControls2 Qt6::QuickDialogs2)
 target_link_libraries(nkphotos PRIVATE photos_core photos_ui photos_uiplugin)
 qt_add_translations(nkphotos TS_FILES translations/nkphotos_zh_CN.ts RESOURCE_PREFIX /i18n)

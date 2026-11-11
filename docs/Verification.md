@@ -1,5 +1,54 @@
 # Verification / 验证
 
+## Local-library expansion — not yet validated / 本地图库扩展尚未验证
+
+The `feat/local-photo-library` work adds a persistent catalog, managed imports,
+albums, date browsing, batch operations, hidden/recovery collections, video and
+Memories playback, export, and a desktop Open With handoff. Source integration and
+Chinese translations have been prepared; this is an **uncompiled development
+checkpoint**, not a release or accepted build.
+
+本次只进行了源码阅读、静态整合和依赖查询，没有运行自动化测试、应用或图形验证。
+虚拟机运行时已查到 Qt 6.11.3 SQL/Multimedia、QSQLITE、FFmpeg/ffprobe；这不等于新代码编译通过。
+自动审批拒绝向指定 VM 传输工作树的同步脚本，因此本次编译和新版真实效果图仍受阻。
+现存截图及下面的历史记录仅对应旧版，不能作为本次验收证据。
+
+Manual acceptance after an authorized VM build / 授权 VM 编译后的人工检查：
+
+- Import synthetic files, restart, and confirm metadata/albums/selection behavior;
+  check missing/revoked folder access without losing catalog records.
+- Distinguish removing an album member, removing a folder reference, moving a
+  managed copy to Recently Deleted, restoring it, and permanently removing it.
+  External originals must remain in place; refresh must not resurrect tombstones.
+- Export same-named files, cancel a large copy, and inspect individual results;
+  retry interrupted operations without overwriting an unrelated file.
+- Inspect year/month/day views, search, hidden exclusions and date fallback labels.
+- Review 740×480 and normal windows, English/Chinese, light/dark, popup focus,
+  Ctrl/Shift selection, return scroll and zoom after panning.
+- Play representative supported/unsupported videos; seek, mute, pause and leave
+  the viewer. Play a Memory with local music, reorder/remove items and exit.
+- Use actual desktop pickers, Open With and NkShot copy editing on the real session.
+  Private-bus screenshots do not establish these portal integrations.
+
+Remaining implementation differences from the approved scope / 尚未完成的范围：
+
+- Memories can be created explicitly from dates or selections; automatic date-recap
+  suggestions are not implemented yet.
+- Indexing remains nonrecursive and capped at 20,000 files or 10 seconds per refresh;
+  continuation through larger sources is not implemented. Capture metadata is
+  limited to available Qt plugin text and bounded video probing.
+- Recovery/expiry handles at most 100 operations/items at startup; continuous
+  cleanup during a long-running session is not implemented.
+
+回忆目前需主动从日期或选择创建，自动日期回顾尚未实现。超大图库的连续索引和长时间
+运行时的持续到期清理也尚未完成；这些不是已经验收的能力。
+
+Application-owned screenshot support is implemented in source. No new screenshot
+has been captured. Pending captures must use disposable profiles and synthetic or
+redistributable media, then be linked to their exact source commit.
+
+## Historical baseline / 历史基线
+
 2026-11-11: first development build verified on VM **172.20.23.3**.
 Code revision: `4653408`. The maintainer host was used only for source/Git and
 viewing screenshots captured in the VM. No host builds, tests or application runs.

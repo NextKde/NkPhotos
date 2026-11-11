@@ -3,7 +3,13 @@
 One app: `org.nextks.photos`, executable `nkphotos`. Shared runtime:
 `org.kde.Platform//6.11`; build SDK: `org.kde.Sdk//6.11`. No BaseApp or
 additional third-party compiled modules. Kos.Ui is statically linked; Qt and
-image plugins are supplied by the runtime. Build only in the designated VM.
+image plugins are supplied by the runtime. SQL/QSQLITE, Qt Multimedia and the
+FFmpeg/ffprobe tools are also supplied by KDE 6.11. Audio output uses the narrowly
+scoped PulseAudio socket; no network access is granted. Build only in the designated VM.
+
+本次图库扩展增加 SQL 和多媒体模块，复用同一 KDE runtime，不增加独立 Qt 环境。
+视频元数据及封面使用 runtime 已有工具；播放格式依赖 runtime 编解码器支持。
+本分支尚未重新构建开发包，下面的体积及启动记录属于历史版本。
 
 ```sh
 flatpak-builder --user --force-clean --repo=tmp/repo tmp/flatpak-build packaging/flatpak/org.nextks.photos.json
