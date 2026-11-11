@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=NkPhotos
+Name[zh_CN]=NkPhotos 照片
+GenericName=Photo Viewer
+GenericName[zh_CN]=照片与看图
+Comment=Browse photo folders and view images
+Comment[zh_CN]=浏览照片文件夹与查看图片
+Exec=nkphotos %U
+Icon=org.nextks.photos
+Terminal=false
+Categories=Graphics;Viewer;Photography;
+MimeType=image/png;image/jpeg;image/webp;image/bmp;image/gif;image/tiff;image/svg+xml;
+StartupNotify=true

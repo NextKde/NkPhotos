@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.nextks.photos</id>
+  <name>NkPhotos</name>
+  <summary>Browse photo folders and view images</summary>
+  <summary xml:lang="zh-CN">浏览照片文件夹与查看图片</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <developer id="org.nextks"><name>NextKde</name></developer>
+  <launchable type="desktop-id">org.nextks.photos.desktop</launchable>
+  <description><p>NkPhotos brings photo-folder browsing and image viewing together. Add folders, find images, keep favorites, and send an editing copy to NkShot.</p></description>
+  <url type="homepage">https://github.com/NextKde/NkPhotos</url>
+  <url type="bugtracker">https://github.com/NextKde/NkPhotos/issues</url>
+  <content_rating type="oars-1.1"/>
+  <supports><control>pointing</control><control>keyboard</control><control>touch</control></supports>
+</component>
