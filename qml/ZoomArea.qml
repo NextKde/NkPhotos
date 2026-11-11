@@ -259,10 +259,8 @@ MouseArea {
             contentItem.width = root.boundedContentWidth(contentItem.width * delta);
             contentItem.height = root.boundedContentHeight(contentItem.height * delta);
 
-            const centroidInItem = Qt.point(
-                centroid.sceneGrabPosition.x - startPosX,
-                centroid.sceneGrabPosition.y - startPosY
-            );
+            const grab = root.mapFromItem(null, centroid.sceneGrabPosition.x, centroid.sceneGrabPosition.y);
+            const centroidInItem = Qt.point(grab.x - startPosX, grab.y - startPosY);
 
             const scaledCentroidInItem = Qt.point(
                 centroidInItem.x * activeScale,
@@ -272,12 +270,12 @@ MouseArea {
             contentItem.x = root.boundedContentX(
                 startPosX +
                 centroidInItem.x - scaledCentroidInItem.x +
-                centroid.position.x - centroid.sceneGrabPosition.x
+                centroid.position.x - grab.x
             );
             contentItem.y = root.boundedContentY(
                 startPosY +
                 centroidInItem.y - scaledCentroidInItem.y +
-                centroid.position.y - centroid.sceneGrabPosition.y
+                centroid.position.y - grab.y
             );
         }
     }

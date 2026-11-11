@@ -20,7 +20,13 @@ KosAppWindow {
     property url editSource
     readonly property string collectionTitle: photoLibrary.mode === "favorites" ? qsTr("Favorites")
         : photoLibrary.mode === "session" ? qsTr("Opened images")
-        : photoLibrary.mode === "folder" ? photoLibrary.folder.toString().split('/').pop() : qsTr("All photos")
+        : photoLibrary.mode === "folder" ? folderTitle() : qsTr("All photos")
+    function folderTitle() {
+        const folders = photoLibrary.folders
+        for (let i = 0; i < folders.length; ++i)
+            if (folders[i].url.toString() === photoLibrary.folder.toString()) return folders[i].name || folders[i].path
+        return qsTr("All photos")
+    }
     Settings {
         id: preferences
         category: "Window"
@@ -48,13 +54,13 @@ KosAppWindow {
         viewing = true
         viewer.forceActiveFocus()
     }
-    Shortcut { sequence: StandardKey.Open; onActivated: filesDialog.open() }
+    Shortcut { sequences: [StandardKey.Open]; onActivated: filesDialog.open() }
     Shortcut { sequence: "Ctrl+Shift+O"; onActivated: folderDialog.open() }
     Shortcut { sequence: "Ctrl+B"; onActivated: preferences.sidebar = !preferences.sidebar }
     Shortcut { sequence: "F5"; onActivated: photoLibrary.refresh() }
     Shortcut { sequence: "F11"; onActivated: root.visibility === Window.FullScreen ? root.showNormal() : root.showFullScreen() }
     Shortcut { sequence: "Escape"; enabled: root.viewing; onActivated: root.viewing = false }
-    Shortcut { sequence: StandardKey.Find; enabled: !root.viewing; onActivated: search.forceActiveFocus() }
+    Shortcut { sequences: [StandardKey.Find]; enabled: !root.viewing; onActivated: search.forceActiveFocus() }
     FileDialog {
         id: filesDialog
         title: qsTr("Open images")
@@ -185,10 +191,11 @@ KosAppWindow {
                                 onClicked: root.showCollection("folder", modelData.url)
                             }
                             ToolButton {
+                                id: removeFolderButton
                                 text: "×"; implicitWidth: 24
                                 Accessible.name: qsTr("Remove folder from library; keep files")
                                 onClicked: photoLibrary.removeFolder(modelData.url)
-                                KosToolTip { visible: parent.hovered; text: qsTr("Remove from library. Files stay on disk.") }
+                                KosToolTip { target: removeFolderButton; text: qsTr("Remove from library. Files stay on disk.") }
                             }
                         }
                         ScrollBar.vertical: ScrollBar {}
