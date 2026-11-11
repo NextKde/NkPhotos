@@ -12,11 +12,27 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QDir>
+#include <QTranslator>
 
 class UiTests : public QObject {
     Q_OBJECT
 private slots:
+    void galleryViewerAndKeyboard_data() {
+        QTest::addColumn<bool>("chinese");
+        QTest::addColumn<bool>("dark");
+        QTest::addColumn<bool>("compact");
+        QTest::newRow("english") << false << false << false;
+        QTest::newRow("chinese-dark") << true << true << false;
+        QTest::newRow("chinese-compact") << true << false << true;
+    }
     void galleryViewerAndKeyboard() {
+        QFETCH(bool,chinese); QFETCH(bool,dark); QFETCH(bool,compact);
+        QTranslator translator;
+        if (chinese) {
+            QVERIFY(translator.load(QCoreApplication::applicationDirPath()+"/nkphotos_zh_CN.qm"));
+            QCoreApplication::installTranslator(&translator);
+            QCOMPARE(QCoreApplication::translate("Main","All photos"),QString::fromUtf8("所有照片"));
+        }
         QTemporaryDir scratch;
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,scratch.path()+"/profile");
@@ -46,11 +62,15 @@ private slots:
         QVERIFY2(!engine.rootObjects().isEmpty(),qPrintable(errors.join('\n')));
         auto *window=qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
+        auto *preferences=window->findChild<QObject *>("preferences");
+        QVERIFY(preferences); preferences->setProperty("appearance",dark ? "dark" : "light");
+        if (compact) { window->setWidth(740); window->setHeight(480); }
         library.addFolder(QUrl::fromLocalFile(scratch.path()+"/images"));
         QTRY_VERIFY_WITH_TIMEOUT(!library.loading(),5000);
         QCOMPARE(library.rowCount(),9);
         QTest::qWait(1200);
-        const QString artifacts=qEnvironmentVariable("NKPHOTOS_ARTIFACT_DIR");
+        const QString artifactRoot=qEnvironmentVariable("NKPHOTOS_ARTIFACT_DIR");
+        const QString artifacts=artifactRoot.isEmpty() ? QString() : artifactRoot+'/'+QTest::currentDataTag();
         if (!artifacts.isEmpty()) { QDir().mkpath(artifacts); QVERIFY(window->grabWindow().save(artifacts+"/gallery.png")); }
         library.select(0);
         QVERIFY(QMetaObject::invokeMethod(window,"openSelected"));
@@ -58,6 +78,15 @@ private slots:
         QVERIFY(picture);
         QTRY_COMPARE_WITH_TIMEOUT(picture->property("status").toInt(),1,5000);
         QCOMPARE(window->property("viewing").toBool(),true);
+        auto *viewer=window->findChild<QQuickItem *>("photoViewer");
+        auto *zoom=window->findChild<QQuickItem *>("zoomArea");
+        QVERIFY(viewer); QVERIFY(zoom);
+        const double fitted=zoom->property("contentWidth").toDouble();
+        QVERIFY(fitted>0);
+        QVERIFY(QMetaObject::invokeMethod(viewer,"zoom",Q_ARG(QVariant,2.0)));
+        QVERIFY(zoom->property("contentWidth").toDouble()>fitted);
+        QVERIFY(QMetaObject::invokeMethod(zoom,"resetToDefaultSize"));
+        QCOMPARE(zoom->property("contentWidth").toDouble(),fitted);
         QTest::keyClick(window,Qt::Key_Right);
         QCOMPARE(library.selectedIndex(),1);
         QTRY_COMPARE_WITH_TIMEOUT(picture->property("status").toInt(),1,5000);
@@ -73,6 +102,7 @@ private slots:
         QCOMPARE(library.rowCount(),8); QCOMPARE(library.selectedIndex(),-1);
         QVERIFY2(errors.isEmpty(),qPrintable(errors.join('\n')));
         window->close();
+        QCoreApplication::removeTranslator(&translator);
     }
 };
 int main(int argc,char **argv) {

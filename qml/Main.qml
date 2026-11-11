@@ -29,6 +29,7 @@ KosAppWindow {
     }
     Settings {
         id: preferences
+        objectName: "preferences"
         category: "Window"
         property int windowWidth: 1080
         property int windowHeight: 720
@@ -162,7 +163,7 @@ KosAppWindow {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 0
             Rectangle {
                 Layout.preferredWidth: 196; Layout.fillHeight: true
-                visible: preferences.sidebar
+                visible: preferences.sidebar && (!root.viewing || root.width >= 1000)
                 color: AppTheme.contentSecondaryBackground
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 14; spacing: 6
@@ -172,6 +173,8 @@ KosAppWindow {
                         delegate: KosItemDelegate {
                             required property var modelData
                             Layout.fillWidth: true
+                            // The delegate uses a tinted selection, not a solid accent fill.
+                            palette.highlightedText: AppTheme.text
                             text: modelData.title
                             highlighted: photoLibrary.mode === modelData.key
                             onClicked: root.showCollection(modelData.key)
@@ -186,13 +189,14 @@ KosAppWindow {
                             width: ListView.view.width; spacing: 0
                             KosItemDelegate {
                                 Layout.fillWidth: true
+                                palette.highlightedText: AppTheme.text
                                 text: modelData.name || modelData.path
                                 highlighted: photoLibrary.mode === "folder" && photoLibrary.folder.toString() === modelData.url.toString()
                                 onClicked: root.showCollection("folder", modelData.url)
                             }
-                            ToolButton {
+                            LiquidActionButton {
                                 id: removeFolderButton
-                                text: "×"; implicitWidth: 24
+                                text: "×"; toolbarAction: true; materialForm: true; iconOnly: true
                                 Accessible.name: qsTr("Remove folder from library; keep files")
                                 onClicked: photoLibrary.removeFolder(modelData.url)
                                 KosToolTip { target: removeFolderButton; text: qsTr("Remove from library. Files stay on disk.") }
@@ -216,7 +220,7 @@ KosAppWindow {
                         Layout.fillWidth: true
                         ColumnLayout {
                             spacing: 4; Layout.fillWidth: true
-                            Label { text: root.collectionTitle; color: AppTheme.text; font.pixelSize: 27; font.weight: Font.DemiBold; textFormat: Text.PlainText }
+                            Label { Layout.fillWidth: true; text: root.collectionTitle; elide: Text.ElideRight; color: AppTheme.text; font.pixelSize: 27; font.weight: Font.DemiBold; textFormat: Text.PlainText }
                             Label {
                                 text: photoLibrary.loading ? qsTr("Loading…") : qsTr("%1 images").arg(photoLibrary.count)
                                 color: AppTheme.mutedText; font.pixelSize: 12
@@ -313,6 +317,7 @@ KosAppWindow {
                 }
                 PhotoViewer {
                     id: viewer
+                    objectName: "photoViewer"
                     anchors.fill: parent; visible: root.viewing
                     photo: photoLibrary.selected
                     showInfo: root.infoVisible

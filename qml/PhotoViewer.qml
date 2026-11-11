@@ -29,6 +29,7 @@ FocusScope {
             Rectangle { anchors.fill: parent; color: AppTheme.dark ? "#101114" : "#eef0f3" }
             ZoomArea {
                 id: area
+                objectName: "zoomArea"
                 anchors.fill: parent; anchors.bottomMargin: 64; anchors.margins: 16
                 implicitContentWidth: picture.implicitWidth
                 implicitContentHeight: picture.implicitHeight
@@ -69,8 +70,11 @@ FocusScope {
         Rectangle {
             Layout.preferredWidth: 228; Layout.fillHeight: true; visible: root.showInfo
             color: AppTheme.contentSecondaryBackground
-            ColumnLayout {
-                anchors.fill: parent; anchors.margins: 20; spacing: 14
+            ScrollView {
+                anchors.fill: parent; anchors.margins: 20; clip: true
+                contentWidth: availableWidth
+                ColumnLayout {
+                width: parent.width; spacing: 14
                 Label { text: qsTr("Image information"); color: AppTheme.text; font.weight: Font.DemiBold; font.pixelSize: 15 }
                 Label { Layout.fillWidth: true; text: root.photo.name || ""; color: AppTheme.text; wrapMode: Text.WrapAnywhere; textFormat: Text.PlainText }
                 Label { text: qsTr("File size"); color: AppTheme.mutedText; font.pixelSize: 11 }
@@ -79,8 +83,8 @@ FocusScope {
                 Label { Layout.fillWidth: true; text: root.photo.modified ? Qt.formatDateTime(root.photo.modified, Qt.DefaultLocaleShortDate) : "—"; color: AppTheme.text; wrapMode: Text.Wrap }
                 Label { text: qsTr("Location"); color: AppTheme.mutedText; font.pixelSize: 11 }
                 Label { Layout.fillWidth: true; text: root.photo.path || ""; textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; color: AppTheme.text; font.pixelSize: 11 }
-                Item { Layout.fillHeight: true }
                 Label { Layout.fillWidth: true; text: qsTr("Large images use a reduced preview. Editing in NkShot creates a separate copy."); wrapMode: Text.Wrap; color: AppTheme.mutedText; font.pixelSize: 11 }
+                }
             }
         }
     }
